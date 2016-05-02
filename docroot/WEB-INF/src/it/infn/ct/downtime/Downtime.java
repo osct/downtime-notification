@@ -139,12 +139,10 @@ public class Downtime extends GenericPortlet {
             String SMTP_HOST = portletPreferences.getValue("SMTP_HOST", "N/A");            
             String SENDER_MAIL = portletPreferences.getValue("SENDER_MAIL", "N/A");                   
                         
-            File df_full = File.createTempFile("full_", ".xml");
+            File df_full = new File("/tmp/full_report.xml");
             File df = null;
             BufferedReader bufReader = null;
             String endpoints = "";
-            //String[] EndpointsArray = new String[downtime_endpoints.length];            
-            int tot = 0;
             boolean flag = false;
             
             // Create a file containing all the downtimes.
@@ -206,9 +204,6 @@ public class Downtime extends GenericPortlet {
                         if (xml2String != null && !xml2String.isEmpty()) {
                             log.info("XML to String using BufferedReader: ");                    
                             log.info(xml2String); 
-                            
-                            //EndpointsArray[i] = xml2String;
-                            tot++;
                             
                             bufferWritter.write(xml2String);
                             
