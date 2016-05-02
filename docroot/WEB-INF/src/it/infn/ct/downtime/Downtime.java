@@ -138,15 +138,15 @@ public class Downtime extends GenericPortlet {
             String downtime_IDs = portletPreferences.getValue("downtime_IDs", "-1");
             String SMTP_HOST = portletPreferences.getValue("SMTP_HOST", "N/A");            
             String SENDER_MAIL = portletPreferences.getValue("SENDER_MAIL", "N/A");                   
-                        
+                                    
             File df_full = new File("/tmp/full_report.xml");
             File df = null;
             BufferedReader bufReader = null;
-            String endpoints = "";
+            String endpoints = "";            
             boolean flag = false;
             
             // Create a file containing all the downtimes.
-            FileWriter fileWritter = new FileWriter(df_full, true);            
+            FileWriter fileWritter = new FileWriter(df_full, false);            
             BufferedWriter bufferWritter = new BufferedWriter(fileWritter);
             
             String header = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
