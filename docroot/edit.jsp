@@ -39,6 +39,7 @@ limitations under the License.
 <jsp:useBean id="downtime_IDs" class="java.lang.String" scope="request"/>
 <jsp:useBean id="SMTP_HOST" class="java.lang.String" scope="request"/>
 <jsp:useBean id="SENDER_MAIL" class="java.lang.String" scope="request"/>
+<jsp:useBean id="LOCAL_ACCOUNT" class="java.lang.String" scope="request"/>
 
 <script type="text/javascript">
     
@@ -108,8 +109,10 @@ limitations under the License.
             }
         });
         
-        $("#DowntimeEditForm").bind('submit', function () {            
-       });                
+        $("#DowntimeEditForm").bind('submit', function () {   
+         if ( !$('#LOCAL_ACCOUNT').is(':checked')) 
+             $('#LOCAL_ACCOUNT_OPTIONS').val('NULL');   
+        });                
     });    
             
 </script>
@@ -268,6 +271,26 @@ limitations under the License.
                class="textfield ui-widget ui-widget-content ui-state-focus"
                size="50px;" 
                value=" <%= SENDER_MAIL %>" />
+    </td>    
+</tr>
+
+<tr>    
+    <td width="150">
+    <img width="30" 
+         align="absmiddle"
+         src="<%= renderRequest.getContextPath()%>/images/question.png"  
+         border="0" title="Notify local (unchecked) or global (from UNITY) users" />
+   
+        <label for="LOCAL_ACCONT">Option</label>
+    </td>
+    <td>
+        <input type="checkbox" 
+               id="LOCAL_ACCOUNT"
+               name="LOCAL_ACCOUNT_OPTIONS"
+               class="textfield ui-widget ui-widget-content ui-state-focus"
+               size="50px;" 
+               <%= LOCAL_ACCOUNT %> 
+               value="enableGLOBAL" />    
     </td>    
 </tr>
 

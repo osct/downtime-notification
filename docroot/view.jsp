@@ -71,6 +71,7 @@ limitations under the License.
 <jsp:useBean id="SMTP_HOST" class="java.lang.String" scope="request"/>
 <jsp:useBean id="SENDER_MAIL" class="java.lang.String" scope="request"/>
 <jsp:useBean id="DOWNTIME_XML" class="java.lang.String" scope="request"/>
+<jsp:useBean id="LOCAL_ACCOUNT" class="java.lang.String" scope="request"/>
 
 <script type="text/javascript">
     
@@ -93,7 +94,7 @@ limitations under the License.
         
     $(document).ready(function() 
     {
-        console.log(jQuery.fn.jquery);
+        //console.log(jQuery.fn.jquery);
         
         <%
             DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
@@ -115,7 +116,7 @@ limitations under the License.
             NodeList FORMATED_START_DATE = document.getElementsByTagName("FORMATED_START_DATE");
             NodeList FORMATED_END_DATE = document.getElementsByTagName("FORMATED_END_DATE");
             NodeList GOCDB_URL = document.getElementsByTagName("GOCDB_PORTAL_URL");            
-            NodeList SEVERITY = document.getElementsByTagName("SEVERITY");            
+            NodeList SEVERITY = document.getElementsByTagName("SEVERITY");             
         %>               
                
         var dataTableSettings = {
@@ -157,7 +158,7 @@ limitations under the License.
                 var text = $("[name='services']",$(this).parent()).html();                
                 table.fnOpen(nTr, format(text), 'details');
             }
-       });
+       });              
     });        
 </script>
 

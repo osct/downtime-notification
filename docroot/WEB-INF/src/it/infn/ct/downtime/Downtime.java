@@ -26,6 +26,11 @@ package it.infn.ct.downtime;
 
 // import liferay libraries
 
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.liferay.portal.kernel.exception.SystemException;
 import com.liferay.portal.model.User;
 import com.liferay.portal.service.UserLocalServiceUtil;
@@ -33,6 +38,10 @@ import com.liferay.portal.service.UserLocalServiceUtil;
 // import DataEngine libraries
 
 // import generic Java libraries
+import com.sun.jersey.api.client.Client;
+import com.sun.jersey.api.client.ClientResponse;
+import com.sun.jersey.api.client.WebResource;
+import com.sun.jersey.api.client.filter.HTTPBasicAuthFilter;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -103,7 +112,8 @@ public class Downtime extends GenericPortlet {
         //String downtime_FILESIZE = portletPreferences.getValue("downtime_FILESIZE", "-1");  
         String downtime_IDs = portletPreferences.getValue("downtime_IDs", "-1");
         String SMTP_HOST = portletPreferences.getValue("SMTP_HOST", "N/A");        
-        String SENDER_MAIL = portletPreferences.getValue("SENDER_MAIL", "N/A");        
+        String SENDER_MAIL = portletPreferences.getValue("SENDER_MAIL", "N/A");
+        String LOCAL_ACCOUNT = portletPreferences.getValue("LOCAL_ACCOUNT", "unchecked");
         
         request.setAttribute("downtime_REFRESH", downtime_REFRESH.trim());
         request.setAttribute("downtime_LOGLEVEL", downtime_LOGLEVEL.trim());
@@ -112,6 +122,7 @@ public class Downtime extends GenericPortlet {
         request.setAttribute("downtime_IDs", downtime_IDs.trim());
         request.setAttribute("SMTP_HOST", SMTP_HOST.trim());
         request.setAttribute("SENDER_MAIL", SENDER_MAIL.trim());
+        request.setAttribute("LOCAL_ACCOUNT", LOCAL_ACCOUNT);
         
         PortletRequestDispatcher dispatcher =
                 getPortletContext().getRequestDispatcher("/edit.jsp");
@@ -137,7 +148,8 @@ public class Downtime extends GenericPortlet {
             downtime_endpoints = portletPreferences.getValues("downtime_endpoints", new String[15]);                   
             String downtime_IDs = portletPreferences.getValue("downtime_IDs", "-1");
             String SMTP_HOST = portletPreferences.getValue("SMTP_HOST", "N/A");            
-            String SENDER_MAIL = portletPreferences.getValue("SENDER_MAIL", "N/A");                   
+            String SENDER_MAIL = portletPreferences.getValue("SENDER_MAIL", "N/A"); 
+            String LOCAL_ACCOUNT = portletPreferences.getValue("LOCAL_ACCOUNT", "unchecked");
                                     
             File df_full = new File("/tmp/full_report.xml");
             File df = null;
@@ -259,35 +271,115 @@ public class Downtime extends GenericPortlet {
                     portletPreferences.setValue("downtime_IDs", ids.substring(0, ids.length()-1));
                 }
                 
-                // Get list of users in Liferay
-                int countUser = UserLocalServiceUtil.getUsersCount();
-                List <User> users = UserLocalServiceUtil.getUsers(0, countUser);
-                for (User liferay_user: users) 
-                {
-                    /*log.info("UserID = " + liferay_user.getUserId() 
+                if (LOCAL_ACCOUNT.equals("unchecked")) 
+                {                
+                    log.info ("\nFetching users locally (from Liferay database)");
+                    int countUser = UserLocalServiceUtil.getUsersCount();
+                    List <User> users = UserLocalServiceUtil.getUsers(0, countUser);
+                    for (User liferay_user: users) 
+                    {
+                        /*log.info("UserID = " + liferay_user.getUserId() 
                         + " UserCompanyID = " + liferay_user.getCompanyId() 
                         + " UserEmail = " + liferay_user.getEmailAddress() 
                         + " UserScreenName = " + liferay_user.getScreenName());*/
                 
-                    if (sending) {
-                        if ( (SMTP_HOST==null) || 
-                             (SMTP_HOST.trim().equals("")) ||
-                             (SMTP_HOST.trim().equals("N/A")) ||
-                             (SENDER_MAIL==null) || 
-                             (SENDER_MAIL.trim().equals("")) ||
-                             (SENDER_MAIL.trim().equals("N/A")) )
-                        log.info ("\nThe Notification Service is not properly configured!!");
+                        if (sending) {
+                            if ( (SMTP_HOST==null) || 
+                                 (SMTP_HOST.trim().equals("")) ||
+                                (SMTP_HOST.trim().equals("N/A")) ||
+                                (SENDER_MAIL==null) || 
+                                (SENDER_MAIL.trim().equals("")) ||
+                                (SENDER_MAIL.trim().equals("N/A")) )
+                            log.info ("\nThe Notification Service is not properly configured!!");
                     
-                        else {
-                            log.info ("\nSending notification to the user [ OK ]");
-                            sendHTMLEmail(                                     
-                                liferay_user.getEmailAddress(),                                
-                                SENDER_MAIL,
-                                SMTP_HOST,
-                                df_full);          
+                            else {
+                                log.info ("\nSending notification to the user " + liferay_user);
+                                sendHTMLEmail(                                     
+                                    //liferay_user.getEmailAddress(),                                
+                                    "giuseppe.larocca@ct.infn.it",
+                                    SENDER_MAIL,
+                                    SMTP_HOST,
+                                    df_full);          
+                            }
+                        }
+                    } // end "local-user" loop.
+                } // end LOCAL_ACCOUNT.equals("unchecked")
+                else {
+                    log.info ("\nFetching users from unity.egi.eu ");
+                    
+                    Gson gson = new Gson();
+                    Properties properties = new Properties();
+                    
+                    String login = "restClient";
+                    String password = "5kcfDZhkv6a0";
+                    
+                    String output = getDataFromUnity("https://unity.egi.eu/rest-admin/v1/group/remote", 
+                            login, 
+                            password);
+                    
+                    System.out.println("[ Response ]");
+                    System.out.println(output);
+                    
+                    JsonObject obj = new JsonParser().parse(output).getAsJsonObject();
+                    JsonArray results = obj.get("members").getAsJsonArray();
+                    
+                    System.out.println("\n[ Parsing ]");
+                    for (int i=0; i<results.size(); i++)
+                    {
+                        String userID = results.get(i).toString();
+                        output = getDataFromUnity("https://unity.egi.eu/rest-admin/v1/entity/"
+                            + userID
+                            + "/attributes?group=/remote",
+                            login, password);
+                        
+                        System.out.println("\n- UserID = " + userID);
+                        properties.setProperty("USERID", userID);
+                        System.out.println(output);
+                        System.out.println();
+                        
+                        JsonArray records = new JsonParser()
+                                .parse(output)
+                                .getAsJsonArray();
+                        
+                        for (int j=0; j<records.size(); j++)
+                        {
+                            String values = records.get(j).toString();
+
+                            JsonElement jelement = new JsonParser().parse(values);
+                            JsonObject entity = jelement.getAsJsonObject();
+
+                            if (values.contains("\"name\":\"email\"")) {
+                                System.out.println("--> " + values);
+                                //System.out.println("[.] " + entity.get("values").toString());
+                                properties.setProperty("EMAIL", entity.get("values").toString());
+                                System.out.println(properties);
+                                
+                                // Sending notification
+                                if (sending) {
+                                    if ( (SMTP_HOST==null) || 
+                                         (SMTP_HOST.trim().equals("")) ||
+                                         (SMTP_HOST.trim().equals("N/A")) ||
+                                         (SENDER_MAIL==null) || 
+                                         (SENDER_MAIL.trim().equals("")) ||
+                                         (SENDER_MAIL.trim().equals("N/A")) )
+                                    log.info ("\nThe Notification Service is not properly configured!!");
+                    
+                                    else {                                        
+                                        log.info ("\nSending notification to the user " 
+                                                + properties.getProperty("EMAIL"));
+                                        
+                                        sendHTMLEmail(                                     
+                                            properties.getProperty("EMAIL"),
+                                            //"giuseppe.larocca@ct.infn.it",
+                                            SENDER_MAIL,
+                                            SMTP_HOST,
+                                            df_full);          
+                                    }
+                                }
+                            }
                         }
                     }
-                }
+                } // end LOCAL_ACCOUNT.equals("checked")
             } else {
                 // Recover original setting.
                 portletPreferences.setValue("downtime_IDs", "-1");
@@ -300,6 +392,7 @@ public class Downtime extends GenericPortlet {
             request.setAttribute("SMTP_HOST", SMTP_HOST.trim());
             request.setAttribute("SENDER_MAIL", SENDER_MAIL.trim());            
             request.setAttribute("DOWNTIME_XML", df_full.toString().trim());
+            request.setAttribute("LOCAL_ACCOUNT", LOCAL_ACCOUNT);
                                     
             // Storing the preferences
             portletPreferences.store();
@@ -369,7 +462,8 @@ public class Downtime extends GenericPortlet {
             String[] downtime_endpoints = request.getParameterValues("downtime_endpoints");                         
             String downtime_IDs = request.getParameter("downtime_IDs");
             String SMTP_HOST = request.getParameter("SMTP_HOST");                
-            String SENDER_MAIL = request.getParameter("SENDER_MAIL");                
+            String SENDER_MAIL = request.getParameter("SENDER_MAIL");
+            String[] LOCAL_ACCOUNT_OPTIONS = request.getParameterValues("LOCAL_ACCOUNT_OPTIONS");
                 
             int nmax=0;                
             for (int i = 0; i < downtime_endpoints.length; i++)
@@ -379,14 +473,25 @@ public class Downtime extends GenericPortlet {
                                     
             String[] downtime_endpoints_trimmed = new String[nmax];
             for (int i = 0; i < nmax; i++)                
-                downtime_endpoints_trimmed[i]=downtime_endpoints[i].trim();                    
+                downtime_endpoints_trimmed[i]=downtime_endpoints[i].trim();
+            
+            String LOCAL_ACCOUNT = "";                    
+
+                    if (LOCAL_ACCOUNT_OPTIONS == null){
+                        LOCAL_ACCOUNT = "unchecked";                       
+                    } else {
+                        Arrays.sort(LOCAL_ACCOUNT_OPTIONS);
+                        // Getting the ABINIT RENEWAL from the portlet preferences for LATO
+                        LOCAL_ACCOUNT = Arrays.binarySearch(LOCAL_ACCOUNT_OPTIONS, "enableGLOBAL") >= 0 ? "checked" : "unchecked";                        
+                    }
                 
             log.info("\n\nPROCESS ACTION => " + action
                      + "\ndowntime_REFRESH: " + downtime_REFRESH
                      + "\ndowntime_LOGLEVEL: " + downtime_LOGLEVEL                     
                      + "\ndowntime_IDs: " + downtime_IDs
                      + "\nSMTP_HOST: " + SMTP_HOST
-                     + "\nSENDER_MAIL: " + SENDER_MAIL);                      
+                     + "\nSENDER_MAIL: " + SENDER_MAIL
+                     + "\nLOCAL ACCOUNT: " + LOCAL_ACCOUNT);                      
                                 
              portletPreferences.setValue("downtime_REFRESH", downtime_REFRESH.trim());
              portletPreferences.setValue("downtime_LOGLEVEL", downtime_LOGLEVEL.trim());                
@@ -394,6 +499,7 @@ public class Downtime extends GenericPortlet {
              portletPreferences.setValue("downtime_IDs", downtime_IDs.trim());
              portletPreferences.setValue("SMTP_HOST", SMTP_HOST.trim());
              portletPreferences.setValue("SENDER_MAIL", SENDER_MAIL.trim());                
+             portletPreferences.setValue("LOCAL_ACCOUNT", LOCAL_ACCOUNT);
                                
              portletPreferences.store();
              response.setPortletMode(PortletMode.VIEW);
@@ -447,6 +553,33 @@ public class Downtime extends GenericPortlet {
 
         // Strip the last separator
         return (ids_list.substring(0, ids_list.length()-1));
+    }
+    
+     public String getDataFromUnity (String url, String login, String password)
+    {
+        String json = "";
+
+        try {
+
+            Client client = Client.create();
+            client.addFilter(new HTTPBasicAuthFilter(login, password));
+
+            WebResource webResource = client
+                    .resource(url);
+
+            ClientResponse response = webResource.accept("application/json")
+                    .get(ClientResponse.class);
+
+            if (response.getStatus() != 200) {
+                throw new RuntimeException("Failed : HTTP error code : "
+                        + response.getStatus());
+            }
+
+            json = response.getEntity(String.class);
+
+        } catch (Exception e) { e.printStackTrace(); }
+
+        return json;
     }
 
                         
@@ -563,7 +696,7 @@ public class Downtime extends GenericPortlet {
                     + downtime_text[3]
                     + "<b><u>TimeStamp:</u></b><br/>" + currentDate + "<br/><br/>" 
                     + "<b><u>Disclaimer:</u></b><br/>"
-                    + "<i>This is an automatic message sent by the LToS Science Gateway based on Liferay technology."
+                    + "<i>This is an automatic message sent by one of the available Science Gateways tailored for the EGI Long of Tail Science."
                     + "<br/><br/>",
                     "text/html");
 
